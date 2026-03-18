@@ -267,13 +267,12 @@ void n_movement::impl_t::edge_bug( )
 			if ( g_utilities.is_in< int >(g_ctx.m_local->get_flags(), invalid_flags) ||
 				g_utilities.is_in< int >(g_prediction.backup_data.m_flags, invalid_flags) ||
 				g_utilities.is_in< int >(g_ctx.m_local->get_move_type(), invalid_move_types) ||
-				g_utilities.is_in< int >(g_prediction.backup_data.m_move_type, invalid_move_types) ||
-				std::roundf(g_prediction.backup_data.m_velocity.m_z) >= 0.f || std::roundf(g_ctx.m_local->get_velocity().m_z) == 0.f
+				g_utilities.is_in< int >(g_prediction.backup_data.m_move_type, invalid_move_types)
 				) {
 				m_edgebug_data.m_will_edgebug = false;
 				break;
 			}
-
+			//				std::roundf(g_prediction.backup_data.m_velocity.m_z) >= 0.f || std::roundf(g_ctx.m_local->get_velocity().m_z) == 0.f
 			if ( !m_edgebug_data.m_will_edgebug )
 				this->detect_edgebug( &simulated_cmd );
 
@@ -722,17 +721,22 @@ void n_movement::impl_t::on_frame_stage_notify( int stage )
 
 void n_movement::impl_t::detect_edgebug( c_user_cmd* cmd )
 {
-	if (g_utilities.is_in< int >(g_ctx.m_local->get_flags(), invalid_flags) ||
-		g_utilities.is_in< int >(g_prediction.backup_data.m_flags, invalid_flags) ||
+	if ( g_utilities.is_in< int >(g_prediction.backup_data.m_flags, invalid_flags) ||
 		g_utilities.is_in< int >(g_ctx.m_local->get_move_type(), invalid_move_types) ||
-		g_utilities.is_in< int >(g_prediction.backup_data.m_move_type, invalid_move_types) ||
-		std::roundf(g_prediction.backup_data.m_velocity.m_z) >= 0.f || std::roundf(g_ctx.m_local->get_velocity().m_z) == 0.f) {
+		g_utilities.is_in< int >(g_prediction.backup_data.m_move_type, invalid_move_types) ) {
 		m_edgebug_data.m_will_edgebug = false;
 		m_edgebug_data.m_will_fail    = true;
 		return;
 	} // the reason why we need continue checking speed for search edgebug
-
+	// 	std::roundf(g_prediction.backup_data.m_velocity.m_z) >= 0.f || std::roundf(g_ctx.m_local->get_velocity().m_z) == 0.f 
 	const auto gravity = g_convars[ HASH_BT( "sv_gravity" ) ]->get_float( );
+
+	float gravity_vel = ( - ( gravity * 0.5f ) * g_interfaces.m_global_vars_base->m_interval_per_tick );
+	
+	if ( g_prediction.backup_data.m_velocity.m_z < gravity_vel && std::roundf( g_ctx.m_local->get_velocity( ).m_z ) == std::roundf( gravity_vel ) ) {
+		m_edgebug_data.m_will_edgebug = true;
+		m_edgebug_data.m_will_fail    = false;
+	}
 
 	if ( g_prediction.backup_data.m_velocity.m_z < -6.25F && std::floorf( g_ctx.m_local->get_velocity( ).m_z ) > std::floorf( g_prediction.backup_data.m_velocity.m_z ) && g_ctx.m_local->get_velocity( ).m_z < -6.25F ) {
 		float previous_velocity = g_ctx.m_local->get_velocity( ).m_z;
