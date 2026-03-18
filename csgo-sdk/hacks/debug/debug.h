@@ -52,7 +52,7 @@ namespace n_debugger
 
 			float offset = 0.f;
 
-			constexpr auto render_debug = [ & ]( const char* indicator_name, const c_color& color, const bool active ) {
+			auto render_debug = [ & ]( const char* indicator_name, const c_color& color, const bool active ) {
 				ImAnimationHelper debug_animation = ImAnimationHelper( fnv1a::hash( indicator_name ), ImGui::GetIO( ).DeltaTime );
 				debug_animation.Update( 2.f, active ? 2.f : -2.f );
 

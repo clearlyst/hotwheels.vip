@@ -17,9 +17,7 @@ bool c_detour_hook::create( void* function, void* detour )
 	const MH_STATUS status = MH_CreateHook( this->m_base_fn, this->m_replace_fn, &this->m_original_fn );
 
 	if ( status != MH_OK ) {
-		g_console.print( std::vformat( "failed to create hook function, status: {:s}\nbase function -> {:p}",
-		                               std::make_format_args( MH_StatusToString( status ), m_base_fn ) )
-		                     .c_str( ) );
+		g_console.print( std::format( "failed to create hook function, status: {:s}\nbase function -> {:p}", MH_StatusToString( status ), m_base_fn ).c_str( ) );
 		return false;
 	}
 
@@ -40,9 +38,7 @@ bool c_detour_hook::replace( )
 	const MH_STATUS status = MH_EnableHook( this->m_base_fn );
 
 	if ( status != MH_OK ) {
-		g_console.print( std::vformat( "failed to enable hook function, status: {:s}\nbase function -> {:p}",
-		                               std::make_format_args( MH_StatusToString( status ), m_base_fn ) )
-		                     .c_str( ) );
+		g_console.print( std::format( "failed to enable hook function, status: {:s}\nbase function -> {:p}", MH_StatusToString( status ), m_base_fn ).c_str( ) );
 		return false;
 	}
 

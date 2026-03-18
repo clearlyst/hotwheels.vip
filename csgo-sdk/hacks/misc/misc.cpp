@@ -294,8 +294,8 @@ void n_misc::impl_t::draw_spectating_local( )
 			return;
 
 		spectator_data.push_back(
-			{ std::vformat( "{} | {}", std::make_format_args( std::string( spectating_info.m_name ).substr( 0, 12 ).append( "..." ),
-		                                                      get_player_spec_type( entity->get_observer_mode( ) ) ) ),
+			{ std::format( "{} | {}", std::string( spectating_info.m_name ).substr( 0, 12 ).append( "..." ),
+		                                                      get_player_spec_type( entity->get_observer_mode( ) ) ),
 		      spectating_info.m_fake_player ? entity_team == e_team_id::team_tt   ? g_render.m_terrorist_avatar
 		                                      : entity_team == e_team_id::team_ct ? g_render.m_counter_terrorist_avatar
 		                                                                          : nullptr

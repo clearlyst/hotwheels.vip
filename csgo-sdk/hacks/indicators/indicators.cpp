@@ -66,9 +66,9 @@ void n_indicators::impl_t::fps_warning( )
 				e_text_flags::text_flag_dropshadow ) );
 
 		const std::string current_fps_text =
-			std::vformat( "current fps: {} needed fps: {}+",
-		                  std::make_format_args( static_cast< int >( ImGui::GetIO( ).Framerate + 0.5f ),
-		                                         static_cast< int >( 1.f / g_interfaces.m_global_vars_base->m_interval_per_tick ) ) );
+			std::format( "current fps: {} needed fps: {}+",
+		                  static_cast< int >( ImGui::GetIO( ).Framerate + 0.5f ),
+		                                         static_cast< int >( 1.f / g_interfaces.m_global_vars_base->m_interval_per_tick ) );
 
 		const auto current_fps_text_size = g_render.m_fonts[ e_font_names::font_name_tahoma_12 ]->CalcTextSizeA(
 			g_render.m_fonts[ e_font_names::font_name_tahoma_12 ]->FontSize, FLT_MAX, 0.f, current_fps_text.c_str( ) );

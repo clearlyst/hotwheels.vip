@@ -159,15 +159,15 @@ std::string n_media_player::impl_t::get_time_formatted( )
 
 	if ( minutes < 1 ) {
 		if ( seconds < 10 )
-			return std::vformat( "0:0{}", std::make_format_args( seconds ) );
+			return std::format( "0:0{}", seconds );
 		else
-			return std::vformat( "0:{}", std::make_format_args( seconds ) );
+			return std::format( "0:{}", seconds );
 	}
 
 	if ( minutes > 0 && seconds - ( 60 * minutes ) < 9 ) {
-		return std::vformat( "{}:0{}", std::make_format_args( minutes, seconds - ( 60 * minutes ) ) );
+		return std::format( "{}:0{}", minutes, seconds - ( 60 * minutes ) );
 	} else if ( minutes > 0 ) {
-		return std::vformat( "{}:{}", std::make_format_args( minutes, seconds - ( 60 * minutes ) ) );
+		return std::format( "{}:{}", minutes, seconds - ( 60 * minutes ) );
 	}
 
 	return "";

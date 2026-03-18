@@ -1,7 +1,7 @@
 #pragma once
 
 /* fast, lightweight logging lib */
-#include <spdlog/spdlog.h>
+#include <spdlog.h>
 
 template< n_console::log_level lev >
 void n_console::impl_t::print( const char* text )
