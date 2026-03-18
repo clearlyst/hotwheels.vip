@@ -267,12 +267,12 @@ void n_movement::impl_t::edge_bug( )
 			if ( g_utilities.is_in< int >(g_ctx.m_local->get_flags(), invalid_flags) ||
 				g_utilities.is_in< int >(g_prediction.backup_data.m_flags, invalid_flags) ||
 				g_utilities.is_in< int >(g_ctx.m_local->get_move_type(), invalid_move_types) ||
-				g_utilities.is_in< int >(g_prediction.backup_data.m_move_type, invalid_move_types)
-				) {
+				g_utilities.is_in< int >(g_prediction.backup_data.m_move_type, invalid_move_types) ||
+			     std::roundf( g_prediction.backup_data.m_velocity.m_z ) >= 0.f || std::roundf( g_ctx.m_local->get_velocity( ).m_z ) == 0.f ) {
 				m_edgebug_data.m_will_edgebug = false;
 				break;
 			}
-			//				std::roundf(g_prediction.backup_data.m_velocity.m_z) >= 0.f || std::roundf(g_ctx.m_local->get_velocity().m_z) == 0.f
+
 			if ( !m_edgebug_data.m_will_edgebug )
 				this->detect_edgebug( &simulated_cmd );
 
@@ -312,8 +312,7 @@ void n_movement::impl_t::edge_bug( )
 	loop_through_ticks( false, false );
 	loop_through_ticks( true, false );
 
-	if ( GET_VARIABLE( g_variables.m_advanced_detection, bool ) &&
-	     yaw_delta < ( GET_VARIABLE( g_variables.m_edge_bug_strafe_delta_max, float ) / 10000.f ) && !g_ctx.m_low_fps ) {
+	if ( GET_VARIABLE( g_variables.m_advanced_detection, bool ) ) {
 		loop_through_ticks( false, true );
 		loop_through_ticks( true, true );
 	}
@@ -727,8 +726,8 @@ void n_movement::impl_t::detect_edgebug( c_user_cmd* cmd )
 		m_edgebug_data.m_will_edgebug = false;
 		m_edgebug_data.m_will_fail    = true;
 		return;
-	} // the reason why we need continue checking speed for search edgebug
-	// 	std::roundf(g_prediction.backup_data.m_velocity.m_z) >= 0.f || std::roundf(g_ctx.m_local->get_velocity().m_z) == 0.f 
+	} 
+
 	const auto gravity = g_convars[ HASH_BT( "sv_gravity" ) ]->get_float( );
 
 	float gravity_vel = ( - ( gravity * 0.5f ) * g_interfaces.m_global_vars_base->m_interval_per_tick );
@@ -737,8 +736,7 @@ void n_movement::impl_t::detect_edgebug( c_user_cmd* cmd )
 		m_edgebug_data.m_will_edgebug = true;
 		m_edgebug_data.m_will_fail    = false;
 	}
-
-	if ( g_prediction.backup_data.m_velocity.m_z < -6.25F && std::floorf( g_ctx.m_local->get_velocity( ).m_z ) > std::floorf( g_prediction.backup_data.m_velocity.m_z ) && g_ctx.m_local->get_velocity( ).m_z < -6.25F ) {
+	else if ( g_prediction.backup_data.m_velocity.m_z < -6.25F && std::floorf( g_ctx.m_local->get_velocity( ).m_z ) > std::floorf( g_prediction.backup_data.m_velocity.m_z ) && g_ctx.m_local->get_velocity( ).m_z < -6.25F ) {
 		float previous_velocity = g_ctx.m_local->get_velocity( ).m_z;
 		
 		g_prediction.begin( g_ctx.m_local, cmd );
