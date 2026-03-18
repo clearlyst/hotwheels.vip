@@ -82,8 +82,6 @@ namespace n_movement
 
 		void auto_align( c_user_cmd* cmd );
 
-		void strafe_to_yaw( c_user_cmd* cmd, c_angle& angle, const float yaw );
-
 		void movement_fix( const c_angle& old_view_point );
 	};
 } // namespace n_movement

@@ -64,83 +64,6 @@ void n_movement::impl_t::on_create_move_post( )
 	this->movement_fix( g_prediction.backup_data.m_view_angles );
 
 	this->edge_bug( );
-
-	// TESTING PURPOSES
-	[ & ]( const bool run ) {
-		if ( !run && GET_VARIABLE( g_variables.m_key_indicators_enable, bool ) )
-			return;
-
-		if ( g_prediction.backup_data.m_flags & e_flags::fl_onground && g_ctx.m_local->get_flags( ) & fl_onground ) {
-			m_jumpbug_data.m_abs_height_diff = m_jumpbug_data.m_height_diff = m_jumpbug_data.m_vertical_velocity_at_landing = 0.f;
-
-			m_jumpbug_data.m_can_jb          = true;
-			m_jumpbug_data.m_ticks_till_land = 0;
-			return;
-		}
-
-		g_prediction.restore_entity_to_predicted_frame( g_interfaces.m_prediction->m_commands_predicted - 1 );
-
-		for ( int i = 0; i < 64; i++ ) {
-			const float backup_origin_z = g_ctx.m_local->get_abs_origin( ).m_z;
-			const float backup_velo_z   = g_ctx.m_local->get_velocity( ).m_z;
-			const int backup_flags      = g_ctx.m_local->get_flags( );
-
-			g_prediction.begin( g_ctx.m_local, g_ctx.m_cmd );
-			g_prediction.end( g_ctx.m_local );
-
-			if ( !( backup_flags & fl_onground ) && g_ctx.m_local->get_flags( ) & fl_onground ) {
-				//	Im at uni and cant really build right now.
-				//	Im writing these comments for @coffin1337 and myself.
-				//
-				// TODO:
-				// simulate jumpbug in here with simulated cmd, same method as in other
-				// features that need simulation.
-				// then, run prediction again and run jumpbug detection code, same as old hotwheels had.
-				// if the detection returns true, the we can jumpbug in the future.
-				// also dont forget to set simulated cmds forward move and side move to 0.f
-				// this idea was provided by patoke but i tried it before, didnt really do it right so
-				// it didnt work.
-				//
-				//
-				// this is what it would look like roughly:
-				// (after this check on line 91)
-				//
-				// 	if ( g_ctx.m_local->get_flags( ) & e_flags::fl_onground && !( backup_flags & e_flags::fl_onground ) )
-				//		simulated_cmd->m_buttons |= e_command_buttons::in_duck;
-				//
-				//	if ( g_ctx.m_local->get_flags( ) & e_flags::fl_onground )
-				//		simulated_cmd->m_buttons &= ~e_command_buttons::in_jump;
-				//
-				//	g_prediction.begin( g_ctx.m_local, simulated_cmd );
-				//	g_prediction.end( g_ctx.m_local );
-				//
-				//	if ( velocity.z > backupvelocity.z && backup flags not on ground && predicted flags not onground)
-				//		jumpbug = expected_vertical_velocity == std::roundf( globals.m_local->velocity( ).m_z );
-				//	else
-				//		jumpbug = false;
-				//
-				// if the code theory from above does not work, we simply have to keep the method below and
-				// do some minor changes to the value for it to work properly. i need a way for numbers to be exact
-				// every time a jumpbug is posible. might have to use std::floor or std::abs.
-				// im pretty sure this current method is better, but it doesnt hurt to try the simulation method.
-				// this simulation method is also used in clarity's route calculator, patoke also does this in his source.
-				// he runs the necessary amount of ticks with prediction and simulates movement techniques
-
-				// LOOOOOOOOOL
-				const bool can_jb = static_cast< int >( backup_origin_z - g_ctx.m_local->get_abs_origin( ).m_z ) >= 3;
-
-				m_jumpbug_data.m_can_jb = can_jb;
-
-				m_jumpbug_data.m_ticks_till_land              = i;
-				m_jumpbug_data.m_abs_height_diff              = std::abs( backup_origin_z - g_ctx.m_local->get_abs_origin( ).m_z );
-				m_jumpbug_data.m_height_diff                  = static_cast< int >( backup_origin_z - g_ctx.m_local->get_abs_origin( ).m_z );
-				m_jumpbug_data.m_vertical_velocity_at_landing = std::floor( g_ctx.m_local->get_velocity( ).m_z );
-				// break;
-			}
-		}
-
-		g_prediction.restore_entity_to_predicted_frame( g_interfaces.m_prediction->m_commands_predicted - 1 );
-	}( GET_VARIABLE( g_variables.m_jump_bug, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_jump_bug_key, key_bind_t ) ) );
 }
 
 void n_movement::impl_t::edge_jump( )
@@ -194,12 +117,12 @@ void n_movement::impl_t::pixel_surf_fix( )
 	if ( !( g_ctx.m_local->get_flags( ) & fl_onground ) )
 		return;
 
-	float wishdelta = ( velocity.length_2d( ) - 285.93f ) * tickrate / sv_airaccelerate->get_float( );
+	float wishdelta = ( velocity.length_2d( ) + 2.f - 285.91f ) * tickrate / sv_airaccelerate->get_float( );
 	auto velo_ang   = c_vector( velocity * -1.f ).to_angle( ).normalize( );
 
 	auto rotation = deg2rad( velo_ang.m_y - g_prediction.backup_data.m_view_angles.m_y );
-	auto cos_rot  = cos( rotation );
-	auto sin_rot  = sin( rotation );
+	auto cos_rot  = std::cosf( rotation );
+	auto sin_rot  = std::sinf( rotation );
 
 	g_ctx.m_cmd->m_forward_move = cos_rot * wishdelta;
 	g_ctx.m_cmd->m_side_move    = -sin_rot * wishdelta;
@@ -620,22 +543,6 @@ void n_movement::impl_t::auto_align( c_user_cmd* cmd )
 	auto strafe_angle = c_angle( g_ctx.m_cmd->m_view_point.m_x, wall_angle.m_y, g_ctx.m_cmd->m_view_point.m_z );
 
 	rotate( strafe_angle, 10.f ); // 10.f is the velocity value at which we gain around 0.03125 velocity instantly
-}
-
-void n_movement::impl_t::strafe_to_yaw( c_user_cmd* cmd, c_angle& angle, const float yaw )
-{
-	const static auto max_side_speed = g_convars[ HASH_BT( "cl_sidespeed" ) ]->get_float( );
-
-	angle.m_y += yaw;
-	cmd->m_side_move    = 0.f;
-	cmd->m_forward_move = 0.f;
-
-	const auto degrees = rad2deg( std::atan2f( g_ctx.m_local->get_velocity( ).m_y, g_ctx.m_local->get_velocity( ).m_x ) );
-
-	const auto delta = g_math.normalize_angle( angle.m_y - degrees );
-
-	cmd->m_side_move = delta > 0.f ? -max_side_speed : max_side_speed;
-	angle.m_y        = g_math.normalize_angle( angle.m_y - delta );
 }
 
 void n_movement::impl_t::on_frame_stage_notify( int stage )
