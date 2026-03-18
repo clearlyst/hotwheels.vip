@@ -80,9 +80,6 @@ namespace n_debugger
 			auto eb = ss_eb.str( );
 
 			render_debug( eb.c_str( ), c_color( 1.f, 1.f, 1.f, 1.f ), g_movement.m_edgebug_data.m_will_edgebug );
-
-			render_debug( g_movement.m_pixelsurf_data.m_should_duck ? "ducked ps" : "stand ps", c_color( 1.f, 1.f, 1.f, 1.f ),
-			              g_movement.m_pixelsurf_data.m_in_pixel_surf || g_movement.m_pixelsurf_data.m_predicted_succesful );
 		}
 
 		void on_frame_stage_notify( int stage )

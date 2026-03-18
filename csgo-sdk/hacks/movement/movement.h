@@ -40,11 +40,7 @@ namespace n_movement
 		} m_jumpbug_data;
 
 		struct pixelsurf_data_t {
-			bool m_predicted_succesful = false, m_in_pixel_surf = false, m_should_duck = false;
-			int m_prediction_ticks      = 0;
-			c_user_cmd* m_simulated_cmd = { };
-
-			void reset( );
+			bool m_will_should{ };
 		} m_pixelsurf_data;
 
 		struct autoduck_data_t {
@@ -78,11 +74,9 @@ namespace n_movement
 
 		void auto_duck( );
 
-		void pixel_surf_locking( float target_ps_velocity );
-
 		void pixel_surf_fix( );
 
-		void pixel_surf( float target_ps_velocity );
+		void pixel_surf( );
 
 		void detect_edgebug( c_user_cmd* cmd );
 

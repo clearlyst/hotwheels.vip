@@ -34,7 +34,6 @@ void __stdcall create_move( int sequence_number, float input_sample_frametime, b
 	[ & ]( ) {
 		if ( !g_ctx.m_local || !g_ctx.m_local->is_alive( ) || !g_ctx.m_cmd || g_ctx.m_local->get_observer_mode( ) != e_obs_mode::obs_mode_none ) {
 			g_movement.m_edgebug_data.reset( );
-			g_movement.m_pixelsurf_data.reset( );
 			g_movement.m_autoduck_data.reset( );
 			return;
 		}

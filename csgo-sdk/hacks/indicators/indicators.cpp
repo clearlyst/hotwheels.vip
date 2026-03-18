@@ -151,7 +151,7 @@ void n_indicators::impl_t::keybind_indicators( )
 	if ( GET_VARIABLE( g_variables.m_pixel_surf, bool ) &&
 	     g_config.get< std::vector< bool > >( g_variables.m_key_indicators )[ e_keybind_indicators::key_ps ] )
 		render_indicator( "ps",
-		                  g_movement.m_pixelsurf_data.m_predicted_succesful || g_movement.m_pixelsurf_data.m_in_pixel_surf
+		                  g_movement.m_pixelsurf_data.m_will_should
 		                      ? GET_VARIABLE( g_variables.m_key_color_success, c_color )
 		                      : GET_VARIABLE( g_variables.m_key_color, c_color ),
 		                  g_input.check_input( &GET_VARIABLE( g_variables.m_pixel_surf_key, key_bind_t ) ) );

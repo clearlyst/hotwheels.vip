@@ -51,20 +51,17 @@ void n_movement::impl_t::on_create_move_post( )
 	if ( GET_VARIABLE( g_variables.m_mini_jump, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_mini_jump_key, key_bind_t ) ) )
 		this->mini_jump( );
 
-	if ( GET_VARIABLE( g_variables.m_auto_align, bool ) && !( g_prediction.backup_data.m_flags & e_flags::fl_onground ||
-	                                                          this->m_pixelsurf_data.m_in_pixel_surf || this->m_edgebug_data.m_will_edgebug ) )
+	if ( GET_VARIABLE( g_variables.m_auto_align, bool ) && !( g_prediction.backup_data.m_flags & e_flags::fl_onground ) )
 		this->auto_align( g_ctx.m_cmd );
 
 	if ( GET_VARIABLE( g_variables.m_pixel_surf_fix, bool ) )
 		this->pixel_surf_fix( );
 
-	this->pixel_surf( target_ps_velocity );
+	this->pixel_surf( );
 
 	this->auto_duck( );
 
 	this->movement_fix( g_prediction.backup_data.m_view_angles );
-
-	this->pixel_surf_locking( target_ps_velocity );
 
 	this->edge_bug( );
 
@@ -210,8 +207,7 @@ void n_movement::impl_t::pixel_surf_fix( )
 
 void n_movement::impl_t::edge_bug( )
 {
-	if ( !( GET_VARIABLE( g_variables.m_edge_bug, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_edge_bug_key, key_bind_t ) ) ) ||
-	     g_movement.m_pixelsurf_data.m_in_pixel_surf  ) {
+	if ( !( GET_VARIABLE( g_variables.m_edge_bug, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_edge_bug_key, key_bind_t ) ) ) ) {
 		m_edgebug_data.reset( );
 		return;
 	}
@@ -381,7 +377,7 @@ void n_movement::impl_t::mini_jump( )
 void n_movement::impl_t::auto_duck( )
 {
 	if ( !GET_VARIABLE( g_variables.m_auto_duck, bool ) || g_prediction.backup_data.m_flags & e_flags::fl_onground ||
-	     g_movement.m_edgebug_data.m_will_edgebug || g_movement.m_pixelsurf_data.m_in_pixel_surf ||
+	     g_movement.m_edgebug_data.m_will_edgebug ||
 	     ( GET_VARIABLE( g_variables.m_jump_bug, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_jump_bug_key, key_bind_t ) ) ) ||
 	     ( GET_VARIABLE( g_variables.m_edge_jump, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_edge_jump_key, key_bind_t ) ) ) ) {
 		g_movement.m_autoduck_data.reset( );
@@ -450,103 +446,53 @@ void n_movement::impl_t::auto_duck( )
 		g_ctx.m_cmd->m_buttons |= e_command_buttons::in_duck;
 }
 
-void n_movement::impl_t::pixel_surf_locking( float target_ps_velocity )
+void n_movement::impl_t::pixel_surf( )
 {
-	if ( g_movement.m_pixelsurf_data.m_in_pixel_surf ) {
-		g_prediction.restore_entity_to_predicted_frame( g_interfaces.m_prediction->m_commands_predicted - 1 );
+	if ( m_pixelsurf_data.m_will_should )
+		g_ctx.m_cmd->m_buttons |= in_duck;
 
-		if ( !g_movement.m_pixelsurf_data.m_predicted_succesful ) {
-			if ( g_movement.m_pixelsurf_data.m_prediction_ticks < g_ctx.m_cmd->m_tick_count )
-				g_movement.m_pixelsurf_data.m_predicted_succesful = true;
-
-			g_ctx.m_cmd->m_buttons      = g_movement.m_pixelsurf_data.m_simulated_cmd->m_buttons;
-			g_ctx.m_cmd->m_side_move    = g_movement.m_pixelsurf_data.m_simulated_cmd->m_side_move;
-			g_ctx.m_cmd->m_forward_move = g_movement.m_pixelsurf_data.m_simulated_cmd->m_forward_move;
-
-			const c_vector movement = { g_ctx.m_cmd->m_forward_move, g_ctx.m_cmd->m_side_move, 0 };
-			c_angle movement_angle{ };
-			g_math.vector_angles( movement, movement_angle );
-
-			const float rotation =
-				deg2rad( g_ctx.m_cmd->m_view_point.m_y - g_movement.m_pixelsurf_data.m_simulated_cmd->m_view_point.m_y + movement_angle.m_y );
-
-			g_ctx.m_cmd->m_forward_move = std::cosf( rotation ) * movement.length_2d( );
-			g_ctx.m_cmd->m_side_move    = std::sinf( rotation ) * movement.length_2d( );
-		}
-
-		if ( g_movement.m_pixelsurf_data.m_should_duck )
-			g_ctx.m_cmd->m_buttons |= e_command_buttons::in_duck;
-		else
-			g_ctx.m_cmd->m_buttons &= ~e_command_buttons::in_duck;
-
-		if ( g_movement.m_pixelsurf_data.m_predicted_succesful && !( g_ctx.m_local->get_velocity( ).m_z == target_ps_velocity ) ) {
-			g_movement.m_pixelsurf_data.m_in_pixel_surf       = false;
-			g_movement.m_pixelsurf_data.m_predicted_succesful = false;
-			return;
-		}
-		return;
-	}
-}
-
-void n_movement::impl_t::pixel_surf( float target_ps_velocity )
-{
-	if ( !( GET_VARIABLE( g_variables.m_pixel_surf, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_pixel_surf_key, key_bind_t ) ) ) ) {
-		g_movement.m_pixelsurf_data.reset( );
+	if ( !( GET_VARIABLE( g_variables.m_pixel_surf, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_pixel_surf_key, key_bind_t ) ) ) ||
+	    m_edgebug_data.m_will_edgebug ) {
+		m_pixelsurf_data.m_will_should = false;
 		return;
 	}
 
-	if ( g_movement.m_pixelsurf_data.m_in_pixel_surf || g_ctx.m_local->get_flags( ) & e_flags::fl_onground ||
-	     g_ctx.m_local->get_velocity( ).m_z >= 0.f )
+	if ( g_utilities.is_in< int >( g_ctx.m_local->get_flags( ), invalid_flags ) ||
+	     g_utilities.is_in< int >( g_prediction.backup_data.m_flags, invalid_flags ) ||
+	     g_utilities.is_in< int >( g_ctx.m_local->get_move_type( ), invalid_move_types ) ||
+	     g_utilities.is_in< int >( g_prediction.backup_data.m_move_type, invalid_move_types ) ||
+	     std::roundf( g_prediction.backup_data.m_velocity.m_z ) >= 0.f || std::roundf( g_ctx.m_local->get_velocity( ).m_z ) == 0.f ) {
+		m_pixelsurf_data.m_will_should = false;
 		return;
+	}
+	
+	const auto gravity = g_convars[ HASH_BT( "sv_gravity" ) ]->get_float( );
+	float gravity_velocity = ( -( gravity * 0.5f ) * g_interfaces.m_global_vars_base->m_interval_per_tick );
 
-	if ( !g_movement.m_pixelsurf_data.m_predicted_succesful ) {
-		g_movement.m_pixelsurf_data.m_should_duck = false;
-		for ( int prediction_type = 0; prediction_type < 2; prediction_type++ ) {
-			if ( g_movement.m_pixelsurf_data.m_in_pixel_surf )
-				break;
+	if ( !m_pixelsurf_data.m_will_should ) {
+		c_user_cmd simulated_cmd = *g_ctx.m_cmd;
+		
+		simulated_cmd.m_buttons |= e_command_buttons::in_bullrush;
+		simulated_cmd.m_buttons |= e_command_buttons::in_duck;
 
-			g_prediction.restore_entity_to_predicted_frame( g_interfaces.m_prediction->m_commands_predicted - 1 );
-
-			int backup_flags         = g_ctx.m_local->get_flags( );
-			c_vector backup_velocity = g_ctx.m_local->get_velocity( );
-
-			for ( int i = 0; i < 12; i++ ) {
-				c_user_cmd* simulated_cmd = new c_user_cmd( *g_ctx.m_cmd );
-
-				simulated_cmd->m_buttons |= e_command_buttons::in_bullrush;
-
-				if ( prediction_type == 0 )
-					simulated_cmd->m_buttons |= e_command_buttons::in_duck;
-				else
-					simulated_cmd->m_buttons &= ~e_command_buttons::in_duck;
-
-				// auto align on pixel surf has to automatically be on.
-				// auto_align( simulated_cmd );
-
-				g_prediction.begin( g_ctx.m_local, simulated_cmd );
-				g_prediction.end( g_ctx.m_local );
-
-				if ( backup_flags & e_flags::fl_onground )
-					break;
-
-				if ( g_ctx.m_local->get_velocity( ).m_z == target_ps_velocity && backup_velocity.m_z == target_ps_velocity ) {
-					g_movement.m_pixelsurf_data.m_prediction_ticks = g_ctx.m_cmd->m_tick_count + i;
-					g_movement.m_pixelsurf_data.m_simulated_cmd    = simulated_cmd;
-					g_movement.m_pixelsurf_data.m_should_duck      = !( prediction_type == 1 );
-					g_movement.m_pixelsurf_data.m_in_pixel_surf    = true;
-					break;
-				}
-
-				backup_velocity = g_ctx.m_local->get_velocity( );
-				backup_flags    = g_ctx.m_local->get_flags( );
-
-				delete simulated_cmd;
-			}
-
-			g_prediction.begin( g_ctx.m_local, g_ctx.m_cmd );
+		for ( int tick = 0; tick < 4; tick++ ) {
+			g_prediction.begin( g_ctx.m_local, &simulated_cmd );
 			g_prediction.end( g_ctx.m_local );
 
-			g_prediction.restore_entity_to_predicted_frame( g_interfaces.m_prediction->m_commands_predicted - 1 );
+			if ( g_utilities.is_in< int >( g_ctx.m_local->get_flags( ), invalid_flags ) ||
+			     g_utilities.is_in< int >( g_prediction.backup_data.m_flags, invalid_flags ) ||
+			     g_utilities.is_in< int >( g_ctx.m_local->get_move_type( ), invalid_move_types ) ||
+			     g_utilities.is_in< int >( g_prediction.backup_data.m_move_type, invalid_move_types ) ||
+			     std::roundf( g_prediction.backup_data.m_velocity.m_z ) >= 0.f || std::roundf( g_ctx.m_local->get_velocity( ).m_z ) == 0.f ) {
+				m_pixelsurf_data.m_will_should = false;
+				break;
+			}
+
+			m_pixelsurf_data.m_will_should = g_prediction.backup_data.m_velocity.m_z < gravity_velocity && std::roundf( g_ctx.m_local->get_velocity( ).m_z ) == std::roundf( gravity_velocity );
+			
+			if ( m_pixelsurf_data.m_will_should ) {
+				break;
+			}
 		}
 	}
 }
@@ -661,7 +607,7 @@ void n_movement::impl_t::auto_align( c_user_cmd* cmd )
 		return false;
 	};
 
-	if ( velocity.length_2d( ) < 5.f || this->m_pixelsurf_data.m_predicted_succesful || g_ctx.m_local->get_flags( ) & e_flags::fl_onground )
+	if ( velocity.length_2d( ) < 5.f || g_ctx.m_local->get_flags( ) & e_flags::fl_onground )
 		return;
 
 	trace_t hit_trace{ };
@@ -764,14 +710,6 @@ void n_movement::impl_t::autoduck_data_t::reset( )
 	g_movement.m_autoduck_data.m_did_land_standing = false;
 	g_movement.m_autoduck_data.m_ducking_vert      = 0.f;
 	g_movement.m_autoduck_data.m_standing_vert     = 0.f;
-}
-
-void n_movement::impl_t::pixelsurf_data_t::reset( )
-{
-	g_movement.m_pixelsurf_data.m_predicted_succesful = false;
-	g_movement.m_pixelsurf_data.m_in_pixel_surf       = false;
-	g_movement.m_pixelsurf_data.m_should_duck         = false;
-	g_movement.m_pixelsurf_data.m_prediction_ticks    = 0;
 }
 
 void n_movement::impl_t::movement_fix( const c_angle& old_view_point )
