@@ -20,7 +20,7 @@ void n_movement::impl_t::on_create_move_pre( )
 
 void n_movement::impl_t::bunny_hop( )
 {
-	if ( !( g_ctx.m_local->get_flags( ) & e_flags::fl_onground ) )
+	if ( !( g_ctx.m_local->get_flags( ) & e_flags::fl_onground ) && ( g_ctx.m_cmd->m_buttons & e_command_buttons::in_jump ) )
 		g_ctx.m_cmd->m_buttons &= ~e_command_buttons::in_jump;
 }
 
@@ -148,30 +148,35 @@ void n_movement::impl_t::on_create_move_post( )
 
 void n_movement::impl_t::edge_jump( )
 {
-	const auto move_type = g_prediction.backup_data.m_move_type;
-	if ( move_type == e_move_types::move_type_noclip || move_type == e_move_types::move_type_fly || move_type == e_move_types::move_type_observer )
+	if ( g_ctx.m_local->get_flags( ) & e_flags::fl_onground )
 		return;
 
-	// is on ladder and wont be on ladder on next tick
-	if ( move_type == e_move_types::move_type_ladder ) {
-		// no need to restore these since we only run it on ladders
-
-		g_prediction.begin( g_ctx.m_local, g_ctx.m_cmd );
-		g_prediction.end( g_ctx.m_local );
-		g_prediction.begin( g_ctx.m_local, g_ctx.m_cmd );
-		g_prediction.end( g_ctx.m_local );
-
-		if ( g_ctx.m_local->get_move_type( ) != e_move_types::move_type_ladder ) {
-			if ( GET_VARIABLE( g_variables.m_edge_jump_ladder, bool ) )
-				g_ctx.m_cmd->m_buttons |= e_command_buttons::in_jump;
-		} else // remove jump flag while in ladder
-			g_ctx.m_cmd->m_buttons &= ~e_command_buttons::in_jump;
-
-		return;
-	}
-
-	if ( ( g_prediction.backup_data.m_flags & e_flags::fl_onground ) && !( g_ctx.m_local->get_flags( ) & e_flags::fl_onground ) )
+	if ( ( g_prediction.backup_data.m_flags & e_flags::fl_onground ) )
 		g_ctx.m_cmd->m_buttons |= e_command_buttons::in_jump;
+	else if ( GET_VARIABLE( g_variables.m_edge_jump_ladder, bool ) ) {
+		static int m_ladder_jump_tick = 0;
+		auto base_move_type    = g_ctx.m_local->get_move_type( );
+
+		g_prediction.begin( g_ctx.m_local, g_ctx.m_cmd );
+		g_prediction.end( g_ctx.m_local );
+
+		if ( base_move_type == e_move_types::move_type_ladder && g_ctx.m_local->get_move_type( ) != e_move_types::move_type_ladder ) {
+			m_ladder_jump_tick = g_interfaces.m_global_vars_base->m_tick_count;
+
+			g_ctx.m_cmd->m_buttons |= e_command_buttons::in_jump;
+			g_ctx.m_cmd->m_forward_move = 0;
+			g_ctx.m_cmd->m_side_move    = 0;
+			g_ctx.m_cmd->m_buttons &= ~( e_command_buttons::in_forward | e_command_buttons::in_back | e_command_buttons::in_moveleft | e_command_buttons::in_moveright );
+		}
+
+		if ( ( g_interfaces.m_global_vars_base->m_tick_count - m_ladder_jump_tick ) > 3 &&
+		     ( g_interfaces.m_global_vars_base->m_tick_count - m_ladder_jump_tick ) < 15 ) {
+			g_ctx.m_cmd->m_forward_move = 0;
+			g_ctx.m_cmd->m_side_move    = 0;
+			g_ctx.m_cmd->m_buttons &=~( e_command_buttons::in_forward | e_command_buttons::in_back | e_command_buttons::in_moveleft | e_command_buttons::in_moveright );
+			g_ctx.m_cmd->m_buttons |= e_command_buttons::in_duck;
+		}
+	}
 }
 
 void n_movement::impl_t::pixel_surf_fix( )
@@ -219,7 +224,7 @@ void n_movement::impl_t::edge_bug( )
 	const float original_side_move    = g_ctx.m_cmd->m_side_move;
 	const auto original_view_point    = g_ctx.m_cmd->m_view_point;
 
-	const auto loop_through_ticks = [ & ]( const bool ducked, const bool strafe = false ) {
+	const auto loop_through_ticks = [ & ]( const bool ducked, const bool strafe ) {
 		if ( m_edgebug_data.m_will_edgebug )
 			return;
 
@@ -228,51 +233,52 @@ void n_movement::impl_t::edge_bug( )
 		g_movement.m_edgebug_data.m_starting_yaw = original_view_point.m_y;
 
 		for ( int i = 0; i <= GET_VARIABLE( g_variables.m_edge_bug_ticks, int ); i++ ) {
-			c_user_cmd* simulated_cmd = new c_user_cmd( *g_ctx.m_cmd );
+			c_user_cmd simulated_cmd = *g_ctx.m_cmd;
 
-			simulated_cmd->m_buttons |= e_command_buttons::in_bullrush;
+			simulated_cmd.m_buttons |= e_command_buttons::in_bullrush;
 
 			if ( ducked ) {
-				simulated_cmd->m_buttons |= e_command_buttons::in_duck;
-				g_ctx.m_local->get_flags( ) |= e_flags::fl_ducking;
+				simulated_cmd.m_buttons |= e_command_buttons::in_duck;
 			} else {
-				simulated_cmd->m_buttons &= ~e_command_buttons::in_duck;
-				g_ctx.m_local->get_flags( ) &= ~e_flags::fl_ducking;
+				simulated_cmd.m_buttons &= ~e_command_buttons::in_duck;
 			}
 
 			if ( !strafe ) {
 				m_edgebug_data.m_strafing = false;
 
-				simulated_cmd->m_forward_move = 0;
-				simulated_cmd->m_side_move    = 0;
-
-				// p sure these are not needed, but just making sure
-				simulated_cmd->m_buttons &= ~( e_command_buttons::in_jump | e_command_buttons::in_forward | e_command_buttons::in_back |
+				simulated_cmd.m_forward_move = 0;
+				simulated_cmd.m_side_move    = 0;
+				simulated_cmd.m_buttons &= ~( e_command_buttons::in_jump | e_command_buttons::in_forward | e_command_buttons::in_back |
 				                               e_command_buttons::in_moveleft | e_command_buttons::in_moveright );
-			} else // strafed
+			}
+			else 
 			{
 				m_edgebug_data.m_strafing = true;
 
-				simulated_cmd->m_forward_move = original_forward_move;
-				simulated_cmd->m_side_move    = original_side_move;
-
-				simulated_cmd->m_view_point.m_y = g_math.normalize_angle( original_view_point.m_y + ( yaw_delta * i ) );
+				simulated_cmd.m_forward_move = original_forward_move;
+				simulated_cmd.m_side_move    = original_side_move;
+				simulated_cmd.m_view_point.m_y = g_math.normalize_angle( original_view_point.m_y + ( yaw_delta * i ) );
 			}
 
-			g_prediction.begin( g_ctx.m_local, simulated_cmd );
+			g_prediction.begin( g_ctx.m_local, &simulated_cmd );
 			g_prediction.end( g_ctx.m_local );
 
-			if ( g_prediction.backup_data.m_flags & e_flags::fl_onground || round( g_prediction.backup_data.m_velocity.m_z ) >= 0 ||
-			     g_ctx.m_local->get_flags( ) & fl_onground || g_ctx.m_local->get_move_type( ) == e_move_types::move_type_ladder ) {
+			// just dublicated?
+			if ( g_utilities.is_in< int >(g_ctx.m_local->get_flags(), invalid_flags) ||
+				g_utilities.is_in< int >(g_prediction.backup_data.m_flags, invalid_flags) ||
+				g_utilities.is_in< int >(g_ctx.m_local->get_move_type(), invalid_move_types) ||
+				g_utilities.is_in< int >(g_prediction.backup_data.m_move_type, invalid_move_types) ||
+				std::roundf(g_prediction.backup_data.m_velocity.m_z) >= 0.f || std::roundf(g_ctx.m_local->get_velocity().m_z) == 0.f
+				) {
 				m_edgebug_data.m_will_edgebug = false;
 				break;
 			}
 
 			if ( !m_edgebug_data.m_will_edgebug )
-				this->detect_edgebug( simulated_cmd );
+				this->detect_edgebug( &simulated_cmd );
 
 			if ( m_edgebug_data.m_will_edgebug ) {
-				m_edgebug_data.m_saved_mousedx = std::abs( simulated_cmd->m_mouse_delta_x );
+				m_edgebug_data.m_saved_mousedx = std::abs( simulated_cmd.m_mouse_delta_x );
 				m_edgebug_data.m_ticks_to_stop = i + 1;
 				m_edgebug_data.m_last_tick     = g_interfaces.m_global_vars_base->m_tick_count;
 
@@ -296,8 +302,6 @@ void n_movement::impl_t::edge_bug( )
 				m_edgebug_data.m_will_fail = false;
 				break;
 			}
-
-			delete simulated_cmd;
 		}
 
 		g_prediction.begin( g_ctx.m_local, g_ctx.m_cmd );
@@ -306,20 +310,16 @@ void n_movement::impl_t::edge_bug( )
 		g_prediction.restore_entity_to_predicted_frame( g_interfaces.m_prediction->m_commands_predicted - 1 );
 	};
 
-	// non strafed edgebugs
-	loop_through_ticks( edgebug_type_t::eb_standing );
-	loop_through_ticks( edgebug_type_t::eb_ducking );
+	loop_through_ticks( false, false );
+	loop_through_ticks( true, false );
 
-	// strafed edgebugs
 	if ( GET_VARIABLE( g_variables.m_advanced_detection, bool ) &&
 	     yaw_delta < ( GET_VARIABLE( g_variables.m_edge_bug_strafe_delta_max, float ) / 10000.f ) && !g_ctx.m_low_fps ) {
-		loop_through_ticks( edgebug_type_t::eb_standing, true );
-		loop_through_ticks( edgebug_type_t::eb_ducking, true );
+		loop_through_ticks( false, true );
+		loop_through_ticks( true, true );
 	}
 
 	if ( m_edgebug_data.m_will_edgebug ) {
-		g_prediction.restore_entity_to_predicted_frame( g_interfaces.m_prediction->m_commands_predicted - 1 );
-
 		if ( g_interfaces.m_global_vars_base->m_tick_count < m_edgebug_data.m_ticks_to_stop + m_edgebug_data.m_last_tick + 1 ) {
 			g_ctx.m_cmd->m_buttons &= ~( e_command_buttons::in_jump | e_command_buttons::in_forward | e_command_buttons::in_back |
 			                             e_command_buttons::in_moveleft | e_command_buttons::in_moveright );
@@ -354,8 +354,11 @@ void n_movement::impl_t::long_jump( )
 	if ( g_ctx.m_local->get_flags( ) & e_flags::fl_onground )
 		saved_tick = g_interfaces.m_global_vars_base->m_tick_count;
 
-	if ( !( g_interfaces.m_global_vars_base->m_tick_count - saved_tick > 2 ) && !( g_ctx.m_local->get_flags( ) & e_flags::fl_onground ) )
+	if ( !( g_interfaces.m_global_vars_base->m_tick_count - saved_tick > 2 ) && !( g_ctx.m_local->get_flags( ) & e_flags::fl_onground ) ) {
+		g_ctx.m_cmd->m_buttons &= ~( e_command_buttons::in_forward | e_command_buttons::in_back );
 		g_ctx.m_cmd->m_buttons |= e_command_buttons::in_duck;
+
+	}
 }
 
 void n_movement::impl_t::mini_jump( )
@@ -367,6 +370,7 @@ void n_movement::impl_t::mini_jump( )
 
 	if ( g_prediction.backup_data.m_flags & e_flags::fl_onground && !( g_ctx.m_local->get_flags( ) & e_flags::fl_onground ) ) {
 		g_ctx.m_cmd->m_buttons |= e_command_buttons::in_jump;
+		g_ctx.m_cmd->m_buttons &= ~( e_command_buttons::in_forward | e_command_buttons::in_back );
 		g_ctx.m_cmd->m_buttons |= e_command_buttons::in_duck;
 		if ( GET_VARIABLE( g_variables.m_mini_jump_hold_duck, bool ) )
 			should_duck = true;
@@ -718,35 +722,28 @@ void n_movement::impl_t::on_frame_stage_notify( int stage )
 
 void n_movement::impl_t::detect_edgebug( c_user_cmd* cmd )
 {
-	if ( g_prediction.backup_data.m_velocity.m_z > 0 || g_utilities.is_in< int >( g_ctx.m_local->get_move_type( ), invalid_move_types ) ) {
+	if (g_utilities.is_in< int >(g_ctx.m_local->get_flags(), invalid_flags) ||
+		g_utilities.is_in< int >(g_prediction.backup_data.m_flags, invalid_flags) ||
+		g_utilities.is_in< int >(g_ctx.m_local->get_move_type(), invalid_move_types) ||
+		g_utilities.is_in< int >(g_prediction.backup_data.m_move_type, invalid_move_types) ||
+		std::roundf(g_prediction.backup_data.m_velocity.m_z) >= 0.f || std::roundf(g_ctx.m_local->get_velocity().m_z) == 0.f) {
 		m_edgebug_data.m_will_edgebug = false;
 		m_edgebug_data.m_will_fail    = true;
 		return;
-	}
+	} // the reason why we need continue checking speed for search edgebug
 
-	if ( round( g_ctx.m_local->get_velocity( ).m_z ) == 0 || g_prediction.backup_data.m_flags & fl_onground ) {
-		m_edgebug_data.m_will_edgebug = false;
-		m_edgebug_data.m_will_fail    = true;
-	} else if ( g_prediction.backup_data.m_velocity.m_z < -6.f && g_ctx.m_local->get_velocity( ).m_z > g_prediction.backup_data.m_velocity.m_z &&
-	            g_ctx.m_local->get_velocity( ).m_z < -6.f && !( g_ctx.m_local->get_flags( ) & fl_onground ) &&
-	            g_prediction.backup_data.m_origin.m_z > g_ctx.m_local->get_abs_origin( ).m_z ) {
-		const auto gravity = g_convars[ HASH_BT( "sv_gravity" ) ]->get_float( );
+	const auto gravity = g_convars[ HASH_BT( "sv_gravity" ) ]->get_float( );
 
-		if ( std::floor( g_prediction.backup_data.m_velocity.m_z ) < -7 && std::floor( g_ctx.m_local->get_velocity( ).m_z ) == -7 &&
-		     g_ctx.m_local->get_velocity( ).length_2d( ) >= g_prediction.backup_data.m_velocity.length_2d( ) ) {
-			m_edgebug_data.m_will_edgebug = true;
-			m_edgebug_data.m_will_fail    = false;
-		} else {
-			float previous_velocity = g_ctx.m_local->get_velocity( ).m_z;
+	if ( g_prediction.backup_data.m_velocity.m_z < -6.25F && std::floorf( g_ctx.m_local->get_velocity( ).m_z ) > std::floorf( g_prediction.backup_data.m_velocity.m_z ) && g_ctx.m_local->get_velocity( ).m_z < -6.25F ) {
+		float previous_velocity = g_ctx.m_local->get_velocity( ).m_z;
+		
+		g_prediction.begin( g_ctx.m_local, cmd );
+		g_prediction.end( g_ctx.m_local );
+		
+		float expected_vertical_velocity = std::roundf(previous_velocity - gravity * g_interfaces.m_global_vars_base->m_interval_per_tick);
 
-			g_prediction.begin( g_ctx.m_local, cmd );
-			g_prediction.end( g_ctx.m_local );
-
-			float expected_vertical_velocity = std::roundf( ( -gravity ) * g_interfaces.m_global_vars_base->m_interval_per_tick + previous_velocity );
-
-			m_edgebug_data.m_will_edgebug = expected_vertical_velocity == std::roundf( g_ctx.m_local->get_velocity( ).m_z );
-			m_edgebug_data.m_will_fail    = !( expected_vertical_velocity == std::roundf( g_ctx.m_local->get_velocity( ).m_z ) );
-		}
+		m_edgebug_data.m_will_edgebug = expected_vertical_velocity == std::roundf( g_ctx.m_local->get_velocity( ).m_z );
+		m_edgebug_data.m_will_fail    = !( expected_vertical_velocity == std::roundf( g_ctx.m_local->get_velocity( ).m_z ) );
 	}
 }
 

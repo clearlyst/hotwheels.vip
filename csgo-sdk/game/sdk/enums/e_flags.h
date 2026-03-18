@@ -34,3 +34,5 @@ enum e_flags : int {
 	fl_transragdoll          = ( 1 << 30 ),
 	fl_unblockable_by_player = ( 1 << 31 )
 };
+
+inline constexpr static const std::initializer_list< int > invalid_flags = { fl_onground, fl_frozen, fl_waterjump, fl_inwater };

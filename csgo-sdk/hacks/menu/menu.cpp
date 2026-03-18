@@ -526,7 +526,7 @@ void n_menu::impl_t::on_end_scene( )
 							ImGui::SetCursorPosX( 25.f );
 							ImGui::Text( "edgebug keybind" );
 							ImGui::Keybind( "edge bug key", &GET_VARIABLE( g_variables.m_edge_bug_key, key_bind_t ) );
-							ImGui::SliderInt( "edge bug predicted ticks", &GET_VARIABLE( g_variables.m_edge_bug_ticks, int ), 0, 32 );
+							ImGui::SliderInt( "edge bug predicted ticks", &GET_VARIABLE( g_variables.m_edge_bug_ticks, int ), 0, 64 );
 							ImGui::SliderFloat( "mouse lock scale", &GET_VARIABLE( g_variables.m_edge_bug_lock_amt, float ), 0.f, 1.f, "%.2f" );
 
 							ImGui::Checkbox( "advanced detection", &GET_VARIABLE( g_variables.m_advanced_detection, bool ) );
