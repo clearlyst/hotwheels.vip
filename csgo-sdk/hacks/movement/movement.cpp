@@ -377,6 +377,8 @@ void n_movement::impl_t::pixel_surf( )
 		g_ctx.m_cmd->m_buttons |= in_duck;
 
 	if ( !( GET_VARIABLE( g_variables.m_pixel_surf, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_pixel_surf_key, key_bind_t ) ) ) ||
+	     ( GET_VARIABLE( g_variables.m_edge_bug, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_edge_bug_key, key_bind_t ) ) ) ||
+	     ( GET_VARIABLE( g_variables.m_jump_bug, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_jump_bug_key, key_bind_t ) ) ) ||
 	    m_edgebug_data.m_will_edgebug ) {
 		m_pixelsurf_data.m_will_should = false;
 		return;
@@ -441,7 +443,7 @@ void n_movement::impl_t::jumpbug_simulation( )
 	const auto gravity = g_convars[ HASH_BT( "sv_gravity" ) ]->get_float( );
 	float gravity_vel = ( -( gravity * 0.5f ) * g_interfaces.m_global_vars_base->m_interval_per_tick );
 
-	for ( int i = 0; i < 12; i++ ) {
+	for ( int i = 0; i < 32; i++ ) {
 		c_user_cmd simulated_cmd = *g_ctx.m_cmd;
 		simulated_cmd.m_buttons |= e_command_buttons::in_duck;
 		simulated_cmd.m_buttons &= ~e_command_buttons::in_jump;
@@ -458,10 +460,11 @@ void n_movement::impl_t::jumpbug_simulation( )
 		float cur_origin_z = g_ctx.m_local->get_abs_origin( ).m_z;
 		int cur_flags   = g_ctx.m_local->get_flags( );
 
-		if ( ( !( prev_flags & fl_onground ) && ( cur_flags & fl_onground ) ) || ( prev_origin_z - cur_origin_z ) >= 3 ||
-		     ( prev_vel_z < gravity_vel && cur_vel_z >= gravity_vel ) ) {
-			m_jumpbug_data.m_will_should = true;
-			return;
+		if ( !( prev_flags & fl_onground ) && ( cur_flags & fl_onground ) ) {
+			if ( prev_vel_z < gravity_vel && std::floorf( cur_vel_z ) > std::floorf( prev_vel_z ) && cur_vel_z > gravity_vel ) {
+				m_jumpbug_data.m_will_should = std::roundf( prev_vel_z - gravity * g_interfaces.m_global_vars_base->m_interval_per_tick ) < std::roundf( g_ctx.m_local->get_velocity( ).m_z );
+				return;
+			}
 		}
 	}
 
@@ -636,8 +639,9 @@ void n_movement::impl_t::detect_edgebug( c_user_cmd* cmd )
 	if ( g_prediction.backup_data.m_velocity.m_z < gravity_vel && std::roundf( g_ctx.m_local->get_velocity( ).m_z ) == std::roundf( gravity_vel ) ) {
 		m_edgebug_data.m_will_edgebug = true;
 		m_edgebug_data.m_will_fail    = false;
-	}
-	else if ( g_prediction.backup_data.m_velocity.m_z < -6.25F && std::floorf( g_ctx.m_local->get_velocity( ).m_z ) > std::floorf( g_prediction.backup_data.m_velocity.m_z ) && g_ctx.m_local->get_velocity( ).m_z < -6.25F ) {
+	} else if ( g_prediction.backup_data.m_velocity.m_z < gravity_vel &&
+	            std::floorf( g_ctx.m_local->get_velocity( ).m_z ) > std::floorf( g_prediction.backup_data.m_velocity.m_z ) &&
+	            g_ctx.m_local->get_velocity( ).m_z < gravity_vel ) {
 		float previous_velocity = g_ctx.m_local->get_velocity( ).m_z;
 		
 		g_prediction.begin( g_ctx.m_local, cmd );
