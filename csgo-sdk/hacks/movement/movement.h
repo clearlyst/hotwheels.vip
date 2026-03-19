@@ -32,11 +32,11 @@ namespace n_movement
 		} m_edgebug_data;
 
 		struct jumpbug_data_t {
+			bool m_will_should{ };
 			int m_height_diff                    = 0.f;
 			float m_vertical_velocity_at_landing = 0.f;
 			float m_abs_height_diff              = 0.f;
 			int m_ticks_till_land                = 0;
-			bool m_can_jb                        = false;
 		} m_jumpbug_data;
 
 		struct pixelsurf_data_t {
@@ -77,6 +77,8 @@ namespace n_movement
 		void pixel_surf_fix( );
 
 		void pixel_surf( );
+
+		void jumpbug_simulation( );
 
 		void detect_edgebug( c_user_cmd* cmd );
 

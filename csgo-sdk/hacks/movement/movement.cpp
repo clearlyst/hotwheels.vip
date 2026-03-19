@@ -40,6 +40,8 @@ void n_movement::impl_t::on_create_move_post( )
 	if ( GET_VARIABLE( g_variables.m_jump_bug, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_jump_bug_key, key_bind_t ) ) )
 		this->jump_bug( );
 
+	this->jumpbug_simulation( );
+
 	const auto move_type = g_prediction.backup_data.m_move_type;
 	if ( move_type == e_move_types::move_type_ladder || move_type == e_move_types::move_type_noclip || move_type == e_move_types::move_type_fly ||
 	     move_type == e_move_types::move_type_observer )
@@ -418,6 +420,52 @@ void n_movement::impl_t::pixel_surf( )
 			}
 		}
 	}
+}
+
+void n_movement::impl_t::jumpbug_simulation( )
+{
+	if ( !( GET_VARIABLE( g_variables.m_jump_bug, bool ) && g_input.check_input( &GET_VARIABLE( g_variables.m_jump_bug_key, key_bind_t ) ) ) ||
+	     m_edgebug_data.m_will_edgebug || m_pixelsurf_data.m_will_should ) {
+		m_jumpbug_data.m_will_should = false;
+		return;
+	}
+
+	if ( g_utilities.is_in< int >( g_ctx.m_local->get_flags( ), invalid_flags ) ||
+	     g_utilities.is_in< int >( g_prediction.backup_data.m_flags, invalid_flags ) ||
+	     g_utilities.is_in< int >( g_ctx.m_local->get_move_type( ), invalid_move_types ) ||
+	     g_utilities.is_in< int >( g_prediction.backup_data.m_move_type, invalid_move_types ) ) {
+		m_jumpbug_data.m_will_should = false;
+		return;
+	}
+
+	const auto gravity = g_convars[ HASH_BT( "sv_gravity" ) ]->get_float( );
+	float gravity_vel = ( -( gravity * 0.5f ) * g_interfaces.m_global_vars_base->m_interval_per_tick );
+
+	for ( int i = 0; i < 12; i++ ) {
+		c_user_cmd simulated_cmd = *g_ctx.m_cmd;
+		simulated_cmd.m_buttons |= e_command_buttons::in_duck;
+		simulated_cmd.m_buttons &= ~e_command_buttons::in_jump;
+		simulated_cmd.m_buttons |= e_command_buttons::in_bullrush;
+
+		float prev_vel_z = g_ctx.m_local->get_velocity( ).m_z;
+		float prev_origin_z = g_ctx.m_local->get_abs_origin( ).m_z;
+		int prev_flags   = g_ctx.m_local->get_flags( );
+
+		g_prediction.begin( g_ctx.m_local, &simulated_cmd );
+		g_prediction.end( g_ctx.m_local );
+
+		float cur_vel_z = g_ctx.m_local->get_velocity( ).m_z;
+		float cur_origin_z = g_ctx.m_local->get_abs_origin( ).m_z;
+		int cur_flags   = g_ctx.m_local->get_flags( );
+
+		if ( ( !( prev_flags & fl_onground ) && ( cur_flags & fl_onground ) ) || ( prev_origin_z - cur_origin_z ) >= 3 ||
+		     ( prev_vel_z < gravity_vel && cur_vel_z >= gravity_vel ) ) {
+			m_jumpbug_data.m_will_should = true;
+			return;
+		}
+	}
+
+	m_jumpbug_data.m_will_should = false;
 }
 
 void n_movement::impl_t::jump_bug( )
