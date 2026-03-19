@@ -103,15 +103,10 @@ void n_movement::impl_t::edge_jump( )
 
 void n_movement::impl_t::pixel_surf_fix( )
 {
-	// creds patoke, todo: test this.
-
 	static const auto sv_airaccelerate = g_convars[ HASH_BT( "sv_airaccelerate" ) ];
 	const auto tickrate                = 1.f / g_interfaces.m_global_vars_base->m_interval_per_tick;
 
 	const auto velocity = g_ctx.m_local->get_velocity( );
-
-	if ( g_ctx.m_cmd->m_buttons & in_duck )
-		return;
 
 	if ( velocity.m_z >= 0.f )
 		return;
@@ -119,7 +114,7 @@ void n_movement::impl_t::pixel_surf_fix( )
 	if ( !( g_ctx.m_local->get_flags( ) & fl_onground ) )
 		return;
 
-	float wishdelta = ( velocity.length_2d( ) + 2.f - 285.91f ) * tickrate / sv_airaccelerate->get_float( );
+	float wishdelta = ( velocity.length_2d( ) + 2.f - 285.91f ) / sv_airaccelerate->get_float( ) * tickrate;
 	auto velo_ang   = c_vector( velocity * -1.f ).to_angle( ).normalize( );
 
 	auto rotation = deg2rad( velo_ang.m_y - g_prediction.backup_data.m_view_angles.m_y );
