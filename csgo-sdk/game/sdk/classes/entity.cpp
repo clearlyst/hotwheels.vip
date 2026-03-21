@@ -406,23 +406,36 @@ c_vector c_base_entity::get_bone_position( int bone )
 
 c_vector c_base_entity::get_hitbox_position( int index, float point_scale )
 {
-	if ( auto model = get_model( ) ) {
-		if ( auto studio_model = g_interfaces.m_model_info->get_studio_model( model ) ) {
-			matrix3x4_t matrix[ 128 ];
+	matrix3x4_t matrixes[ 128 ];
 
-			if ( setup_bones( matrix, 128, 0x100, 0.f ) ) {
-				if ( auto hitbox_set_ = studio_model->get_hitbox_set( get_hitbox_set( ) ) ) {
-					if ( auto hitbox = hitbox_set_->get_hitbox( index ) ) {
-						auto position = ( hitbox->m_bb_min + hitbox->m_bb_max ) * point_scale;
+	if ( !setup_bones( matrixes, 128, 0x00000100, g_interfaces.m_global_vars_base->m_current_time ) )
+		return { };
 
-						return g_math.vector_transform( position, matrix[ hitbox->m_bone ] );
-					}
-				}
-			}
-		}
-	}
+	const auto model = get_model( );
 
-	return { };
+	if ( !model )
+		return { };
+
+	const auto studio_hdr = g_interfaces.m_model_info->get_studio_model( model );
+
+	if ( !studio_hdr )
+		return { };
+
+	auto hitbox_set = studio_hdr->get_hitbox_set( get_hitbox_set( ) );
+	if ( !hitbox_set )
+		return { };
+
+	auto new_hitbox = hitbox_set->get_hitbox( index );
+	if ( !new_hitbox )
+		return { };
+
+	const matrix3x4_t& matrix = matrixes[ new_hitbox->m_bone ];
+	const float modifier      = new_hitbox->m_radius != -1.0f ? new_hitbox->m_radius : 0.0f;
+
+	const auto min = g_math.vector_transform( new_hitbox->m_bb_min - modifier, matrix );
+	const auto max = g_math.vector_transform( new_hitbox->m_bb_max + modifier, matrix );
+
+	return ( min + max ) * point_scale;
 }
 
 c_vector c_base_entity::get_hitbox_position( int hitbox, matrix3x4_t* matrix, float point_scale )

@@ -80,44 +80,44 @@ bool n_interfaces::impl_t::on_attach( )
 		return false;
 	else
 		g_console.print(
-			std::vformat( "found IKeyValuesSystem @ {:p}", std::make_format_args( reinterpret_cast< void* >( m_key_values_system ) ) ).c_str( ) );
+			std::format( "found IKeyValuesSystem @ {:p}", reinterpret_cast< void* >( m_key_values_system )  ).c_str( ) );
 
 	if ( !( m_global_vars_base = **reinterpret_cast< c_global_vars_base*** >( g_virtual.get< unsigned int >( m_base_client, 11 ) + 0xa ) ) )
 		return false;
 	else
 		g_console.print(
-			std::vformat( "found IGlobalVarsBase @ {:p}", std::make_format_args( reinterpret_cast< void* >( m_global_vars_base ) ) ).c_str( ) );
+			std::format( "found IGlobalVarsBase @ {:p}", reinterpret_cast< void* >( m_global_vars_base ) ).c_str( ) );
 
 	if ( !( m_client_mode = **reinterpret_cast< void*** >( g_virtual.get< unsigned int >( m_base_client, 10 ) + 0x5 ) ) )
 		return false;
 	else
 		g_console.print(
-			std::vformat( "found IClientModeShared @ {:p}", std::make_format_args( reinterpret_cast< void* >( m_client_mode ) ) ).c_str( ) );
+			std::format( "found IClientModeShared @ {:p}", reinterpret_cast< void* >( m_client_mode ) ).c_str( ) );
 
 	if ( !( m_weapon_system =
 	            *reinterpret_cast< c_weapon_system** >( g_modules[ CLIENT_DLL ].find_pattern( ( "8B 35 ? ? ? ? FF 10 0F B7 C0" ) ) + 0x2 ) ) )
 		return false;
 	else
 		g_console.print(
-			std::vformat( "found IWeaponSystem @ {:p}", std::make_format_args( reinterpret_cast< void* >( m_weapon_system ) ) ).c_str( ) );
+			std::format( "found IWeaponSystem @ {:p}", reinterpret_cast< void* >( m_weapon_system ) ).c_str( ) );
 
 	if ( !( m_client_state = **reinterpret_cast< c_client_state*** >(
 				g_modules[ ENGINE_DLL ].find_pattern( ( "A1 ? ? ? ? 8B 88 ? ? ? ? 85 C9 75 07" ) ) + 0x1 ) ) )
 		return false;
 	else
-		g_console.print( std::vformat( "found IClientState @ {:p}", std::make_format_args( reinterpret_cast< void* >( m_client_state ) ) ).c_str( ) );
+		g_console.print( std::format( "found IClientState @ {:p}",  reinterpret_cast< void* >( m_client_state ) ).c_str( ) );
 
 	if ( !( m_input = *reinterpret_cast< c_input** >( g_modules[ CLIENT_DLL ].find_pattern( "B9 ? ? ? ? F3 0F 11 04 24 FF 50 10" ) + 0x1 ) ) )
 		return false;
 	else
-		g_console.print( std::vformat( "found IInput @ {:p}", std::make_format_args( reinterpret_cast< void* >( m_input ) ) ).c_str( ) );
+		g_console.print( std::format( "found IInput @ {:p}", reinterpret_cast< void* >( m_input ) ).c_str( ) );
 
 	if ( !( m_direct_device =
 	            **reinterpret_cast< IDirect3DDevice9*** >( g_modules[ SHADERAPIDX9_DLL ].find_pattern( "A1 ? ? ? ? 50 8B 08 FF 51 0C" ) + 0x1 ) ) )
 		return false;
 	else
 		g_console.print(
-			std::vformat( "found IDirect3DDevice9 @ {:p}", std::make_format_args( reinterpret_cast< void* >( m_direct_device ) ) ).c_str( ) );
+			std::format( "found IDirect3DDevice9 @ {:p}",  reinterpret_cast< void* >( m_direct_device ) ).c_str( ) );
 
 	if ( !( g_scaleform.compare_extension = reinterpret_cast< decltype( g_scaleform.compare_extension ) >(
 				g_modules[ PANORAMA_DLL ].find_pattern( "55 8B EC 53 57 8B 7D 08 85" ) ) ) )

@@ -52,7 +52,7 @@ namespace n_debugger
 
 			float offset = 0.f;
 
-			constexpr auto render_debug = [ & ]( const char* indicator_name, const c_color& color, const bool active ) {
+			auto render_debug = [ & ]( const char* indicator_name, const c_color& color, const bool active ) {
 				ImAnimationHelper debug_animation = ImAnimationHelper( fnv1a::hash( indicator_name ), ImGui::GetIO( ).DeltaTime );
 				debug_animation.Update( 2.f, active ? 2.f : -2.f );
 
@@ -80,9 +80,6 @@ namespace n_debugger
 			auto eb = ss_eb.str( );
 
 			render_debug( eb.c_str( ), c_color( 1.f, 1.f, 1.f, 1.f ), g_movement.m_edgebug_data.m_will_edgebug );
-
-			render_debug( g_movement.m_pixelsurf_data.m_should_duck ? "ducked ps" : "stand ps", c_color( 1.f, 1.f, 1.f, 1.f ),
-			              g_movement.m_pixelsurf_data.m_in_pixel_surf || g_movement.m_pixelsurf_data.m_predicted_succesful );
 		}
 
 		void on_frame_stage_notify( int stage )

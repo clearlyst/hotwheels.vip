@@ -66,9 +66,9 @@ void n_indicators::impl_t::fps_warning( )
 				e_text_flags::text_flag_dropshadow ) );
 
 		const std::string current_fps_text =
-			std::vformat( "current fps: {} needed fps: {}+",
-		                  std::make_format_args( static_cast< int >( ImGui::GetIO( ).Framerate + 0.5f ),
-		                                         static_cast< int >( 1.f / g_interfaces.m_global_vars_base->m_interval_per_tick ) ) );
+			std::format( "current fps: {} needed fps: {}+",
+		                  static_cast< int >( ImGui::GetIO( ).Framerate + 0.5f ),
+		                                         static_cast< int >( 1.f / g_interfaces.m_global_vars_base->m_interval_per_tick ) );
 
 		const auto current_fps_text_size = g_render.m_fonts[ e_font_names::font_name_tahoma_12 ]->CalcTextSizeA(
 			g_render.m_fonts[ e_font_names::font_name_tahoma_12 ]->FontSize, FLT_MAX, 0.f, current_fps_text.c_str( ) );
@@ -151,7 +151,7 @@ void n_indicators::impl_t::keybind_indicators( )
 	if ( GET_VARIABLE( g_variables.m_pixel_surf, bool ) &&
 	     g_config.get< std::vector< bool > >( g_variables.m_key_indicators )[ e_keybind_indicators::key_ps ] )
 		render_indicator( "ps",
-		                  g_movement.m_pixelsurf_data.m_predicted_succesful || g_movement.m_pixelsurf_data.m_in_pixel_surf
+		                  g_movement.m_pixelsurf_data.m_will_should
 		                      ? GET_VARIABLE( g_variables.m_key_color_success, c_color )
 		                      : GET_VARIABLE( g_variables.m_key_color, c_color ),
 		                  g_input.check_input( &GET_VARIABLE( g_variables.m_pixel_surf_key, key_bind_t ) ) );
@@ -180,7 +180,7 @@ void n_indicators::impl_t::keybind_indicators( )
 
 	if ( GET_VARIABLE( g_variables.m_jump_bug, bool ) &&
 	     g_config.get< std::vector< bool > >( g_variables.m_key_indicators )[ e_keybind_indicators::key_jb ] )
-		render_indicator( "jb", g_movement.m_jumpbug_data.m_can_jb ? GET_VARIABLE( g_variables.m_key_color, c_color ) : c_color( 1.f, 0.f, 0.f, 1.f ),
+		render_indicator( "jb", g_movement.m_jumpbug_data.m_will_should ? GET_VARIABLE( g_variables.m_key_color, c_color ) : c_color( 1.f, 0.f, 0.f, 1.f ),
 		                  g_input.check_input( &GET_VARIABLE( g_variables.m_jump_bug_key, key_bind_t ) ) );
 }
 

@@ -12,13 +12,12 @@ void __fastcall n_detoured_functions::override_mouse_input( void* thisptr, int e
 		return original( thisptr, edx, x, y );
 
 	if ( g_movement.m_edgebug_data.m_will_edgebug && *x != 0 ) {
-		const float factor =
-			100.f /
-			( static_cast< float >( std::pow< int, float >( g_movement.m_edgebug_data.m_ticks_to_stop,
-		                                                    ( g_movement.m_edgebug_data.m_last_tick + g_movement.m_edgebug_data.m_ticks_to_stop -
-		                                                      g_interfaces.m_global_vars_base->m_tick_count ) /
-		                                                        *x ) ) +
-		      100.f + ( GET_VARIABLE( g_variables.m_edge_bug_lock_amt, float ) * g_movement.m_edgebug_data.m_saved_mousedx ) );
+		const float factor = 
+			100.f / 
+			( static_cast< float >( std::pow< int, float >
+				( g_movement.m_edgebug_data.m_ticks_to_stop, ( g_movement.m_edgebug_data.m_last_tick + g_movement.m_edgebug_data.m_ticks_to_stop - g_interfaces.m_global_vars_base->m_tick_count )
+				/ *x ) ) + 100.f + ( GET_VARIABLE( g_variables.m_edge_bug_lock_amt, float ) * g_movement.m_edgebug_data.m_saved_mousedx )
+			);
 
 		if ( !std::isnan( factor ) )
 			*x *= factor;

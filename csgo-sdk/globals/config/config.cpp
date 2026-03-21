@@ -143,7 +143,7 @@ bool n_config::impl_t::save( std::string_view file_name )
 			config.push_back( entry );
 		}
 	} catch ( const nlohmann::detail::exception& ex ) {
-		g_console.print( std::vformat( "failed to save {}", std::make_format_args( ex.what( ) ) ).c_str( ) );
+		g_console.print( std::vformat( "failed to save {}", std::make_format_args( *ex.what( ) ) ).c_str( ) );
 		return false;
 	}
 
@@ -155,7 +155,7 @@ bool n_config::impl_t::save( std::string_view file_name )
 		output_file << config.dump( 4 );
 		output_file.close( );
 	} catch ( std::ofstream::failure& ex ) {
-		g_console.print( std::vformat( "failed to save {}", std::make_format_args( ex.what( ) ) ).c_str( ) );
+		g_console.print( std::vformat( "failed to save {}", std::make_format_args( *ex.what( ) ) ).c_str( ) );
 		return false;
 	}
 
@@ -180,7 +180,7 @@ bool n_config::impl_t::load( std::string_view file_name )
 
 		input_file.close( );
 	} catch ( std::ifstream::failure& ex ) {
-		g_console.print( std::vformat( "failed to load {}", std::make_format_args( ex.what( ) ) ).c_str( ) );
+		g_console.print( std::vformat( "failed to load {}", std::make_format_args( *ex.what( ) ) ).c_str( ) );
 		return false;
 	}
 
@@ -279,7 +279,7 @@ bool n_config::impl_t::load( std::string_view file_name )
 			}
 		}
 	} catch ( const nlohmann::detail::exception& ex ) {
-		g_console.print( std::vformat( "json load failed {}", std::make_format_args( ex.what( ) ) ).c_str( ) );
+		g_console.print( std::vformat( "json load failed {}", std::make_format_args( *ex.what( ) ) ).c_str( ) );
 		return false;
 	}
 
