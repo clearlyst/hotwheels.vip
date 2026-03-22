@@ -33,14 +33,11 @@ namespace n_movement
 
 		struct jumpbug_data_t {
 			bool m_will_should{ };
-			int m_height_diff                    = 0.f;
-			float m_vertical_velocity_at_landing = 0.f;
-			float m_abs_height_diff              = 0.f;
-			int m_ticks_till_land                = 0;
 		} m_jumpbug_data;
 
 		struct pixelsurf_data_t {
-			bool m_will_should{ };
+			bool m_did_ducking{ };
+			bool m_detected{ };
 		} m_pixelsurf_data;
 
 		struct autoduck_data_t {
@@ -56,9 +53,6 @@ namespace n_movement
 		void on_create_move_post( );
 
 		void on_frame_stage_notify( int stage );
-
-		void rotate_movement( c_user_cmd* cmd, c_angle& angle );
-
 	private:
 		void bunny_hop( );
 
@@ -74,17 +68,19 @@ namespace n_movement
 
 		void auto_duck( );
 
-		void pixel_surf_fix( );
-
 		void pixel_surf( );
 
-		void jumpbug_simulation( );
+		void jump_bug_simulation( );
+
+		void pixel_surf_fix( );
 
 		void detect_edgebug( c_user_cmd* cmd );
 
-		void auto_align( c_user_cmd* cmd );
+		void auto_align( );
 
 		void movement_fix( const c_angle& old_view_point );
+		
+		void infinity_duck( );
 	};
 } // namespace n_movement
 

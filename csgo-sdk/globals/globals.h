@@ -37,6 +37,8 @@ namespace n_ctx
 		int m_last_spectators_y = 5;
 
 		char m_windows_directory[ 64 ]{ };
+
+		float half_gravity_per_tick{ };
 	};
 
 } // namespace n_globals

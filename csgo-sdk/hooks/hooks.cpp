@@ -112,8 +112,10 @@ bool n_hooks::impl_t::on_attach( )
 	initialise_hook( m_end_scene, g_virtual.get( g_interfaces.m_direct_device, 42 ), &n_detoured_functions::end_scene,
 	                 "IDirect3DDevice9::EndScene()" );
 
-	if ( g_interfaces.m_engine_client->is_in_game( ) )
+	if ( g_interfaces.m_engine_client->is_in_game( ) || g_interfaces.m_engine_client->is_connected( ) )
 		g_interfaces.m_client_state->m_delta_tick = -1;
+
+	g_ctx.half_gravity_per_tick = ( -( g_convars[ HASH_BT( "sv_gravity" ) ]->get_float( ) * 0.5f ) * g_interfaces.m_global_vars_base->m_interval_per_tick );
 
 	return true;
 }
