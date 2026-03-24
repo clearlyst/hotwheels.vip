@@ -22,7 +22,7 @@ namespace
 
 	[[nodiscard]] __forceinline bool local_entity_is_alive( )
 	{
-		return founded_local_entity( ) && g_ctx.m_local->get_observer_mode( ) <= 0 && g_ctx.m_local->is_alive( );
+		return founded_local_entity( ) && g_ctx.m_local->get_observer_mode( ) <= e_obs_mode::obs_mode_none && g_ctx.m_local->is_alive( );
 	}
 
 	[[nodiscard]] __forceinline bool allowed_proccess( )
@@ -118,8 +118,11 @@ void n_movement::impl_t::on_create_move_pre( )
 
 void n_movement::impl_t::on_create_move_post( )
 {
-	if ( !allowed_proccess( ) )
+	if ( !allowed_proccess( ) ) {
+		g_movement.m_edgebug_data.reset( );
+		g_movement.m_autoduck_data.reset( );
 		return;
+	}
 
 	edge_jump( );
 	long_jump( );
@@ -234,69 +237,73 @@ void n_movement::impl_t::edge_bug( )
 		return;
 	}
 
-	const float yaw_delta = std::clamp( g_prediction.backup_data.m_view_angles.m_y - g_ctx.m_last_tick_yaw,
-	                -( 180.f / GET_VARIABLE( g_variables.m_edge_bug_ticks, int ) ), ( 180.f / GET_VARIABLE( g_variables.m_edge_bug_ticks, int ) ) );
+	const int max_ticks = GET_VARIABLE( g_variables.m_edge_bug_ticks, int );
+	if ( max_ticks <= 0 ) {
+		m_edgebug_data.reset( );
+		return;
+	}
 
-	const float original_forward_move = g_ctx.m_cmd->m_forward_move;
-	const float original_side_move    = g_ctx.m_cmd->m_side_move;
-	const auto original_view_point    = g_ctx.m_cmd->m_view_point;
+	const float original_forward = g_ctx.m_cmd->m_forward_move;
+	const float original_side    = g_ctx.m_cmd->m_side_move;
+	const auto original_view     = g_ctx.m_cmd->m_view_point;
 
-	const auto loop_through_ticks = [ & ]( const bool ducked, const bool strafe ) {
-		if ( m_edgebug_data.m_will_edgebug )
-			return;
+	const float max_yaw_per_tick = 180.f / static_cast< float >( max_ticks );
+	const float raw_yaw_delta    = g_prediction.backup_data.m_view_angles.m_y - g_ctx.m_last_tick_yaw;
+	const float yaw_step         = std::clamp( raw_yaw_delta, -max_yaw_per_tick, max_yaw_per_tick );
 
+	struct simulation_mode_t {
+		bool duck   = false;
+		bool strafe = false;
+	};
+
+	simulation_mode_t modes[ 4 ] = { { false, false }, { true, false }, { false, true }, { true, true } };
+
+	const int mode_count = GET_VARIABLE( g_variables.m_advanced_detection, bool ) ? 4 : 2;
+
+	auto simulate_mode = [ & ]( const simulation_mode_t& mode ) -> bool {
 		restore_prediction_frame( );
-		m_edgebug_data.m_starting_yaw = original_view_point.m_y;
 
-		for ( int i = 0; i <= GET_VARIABLE( g_variables.m_edge_bug_ticks, int ); ++i ) {
+		for ( int tick = 0; tick < max_ticks; ++tick ) {
 			c_user_cmd simulated_cmd = *g_ctx.m_cmd;
 			add_button( &simulated_cmd, in_bullrush );
 
-			if ( ducked ) {
-				if ( is_pressed_button( &simulated_cmd, in_jump ) )
-					clear_button( &simulated_cmd, in_jump );
-
+			if ( mode.duck ) {
+				clear_button( &simulated_cmd, in_jump );
 				add_button( &simulated_cmd, in_duck );
-			}
-			else 
-				clear_button( &simulated_cmd, in_duck );
-
-			if ( !strafe ) {
-				m_edgebug_data.m_strafing    = false;
-				stop_full_move( &simulated_cmd );
 			} else {
-				m_edgebug_data.m_strafing      = true;
-				simulated_cmd.m_forward_move   = original_forward_move;
-				simulated_cmd.m_side_move      = original_side_move;
-				simulated_cmd.m_view_point.m_y = g_math.normalize_angle( original_view_point.m_y + ( yaw_delta * i ) );
+				clear_button( &simulated_cmd, in_duck );
+			}
+
+			if ( mode.strafe ) {
+				simulated_cmd.m_forward_move   = original_forward;
+				simulated_cmd.m_side_move      = original_side;
+				simulated_cmd.m_view_point.m_y = g_math.normalize_angle( original_view.m_y + yaw_step * static_cast< float >( tick ) );
+			} else {
+				stop_full_move( &simulated_cmd );
 			}
 
 			predict_cmd( &simulated_cmd );
 
-			if ( has_invalid_movement_state( ) || local_entity_is_not_falling( ) || local_entity_is_staying( ) ) {
+			if ( has_invalid_movement_state( ) || local_entity_is_not_falling( ) ) {
 				m_edgebug_data.m_will_edgebug = false;
+				m_edgebug_data.m_will_fail    = false;
 				break;
 			}
 
-			if ( !m_edgebug_data.m_will_edgebug )
-				detect_edgebug( &simulated_cmd );
+			detect_edgebug( &simulated_cmd );
 
 			if ( m_edgebug_data.m_will_edgebug ) {
-				m_edgebug_data.m_saved_mousedx  = std::abs( simulated_cmd.m_mouse_delta_x );
-				m_edgebug_data.m_ticks_to_stop  = i + 1;
-				m_edgebug_data.m_last_tick      = g_interfaces.m_global_vars_base->m_tick_count;
-				m_edgebug_data.m_edgebug_method = ducked ? edgebug_type_t::eb_ducking : edgebug_type_t::eb_standing;
+				m_edgebug_data.m_strafing      = mode.strafe;
+				m_edgebug_data.m_ticks_to_stop = tick + 1;
+				m_edgebug_data.m_last_tick     = g_interfaces.m_global_vars_base->m_tick_count;
+				m_edgebug_data.m_saved_mousedx = std::abs( simulated_cmd.m_mouse_delta_x );
+				m_edgebug_data.m_starting_yaw  = original_view.m_y;
+				m_edgebug_data.m_yaw_step      = yaw_step;
+				m_edgebug_data.m_forward_move  = mode.strafe ? original_forward : 0.f;
+				m_edgebug_data.m_side_move     = mode.strafe ? original_side : 0.f;
+				m_edgebug_data.m_method        = mode.duck ? edgebug_method_t::ducking : edgebug_method_t::standing;
 
-				if ( strafe ) {
-					m_edgebug_data.m_yaw_delta    = yaw_delta;
-					m_edgebug_data.m_forward_move = original_forward_move;
-					m_edgebug_data.m_side_move    = original_side_move;
-				} else {
-					m_edgebug_data.m_forward_move = 0.f;
-					m_edgebug_data.m_side_move    = 0.f;
-				}
-
-				break;
+				return true;
 			}
 
 			if ( m_edgebug_data.m_will_fail ) {
@@ -305,46 +312,46 @@ void n_movement::impl_t::edge_bug( )
 			}
 		}
 
-		predict_cmd( g_ctx.m_cmd );
-		restore_prediction_frame( );
+		return false;
 	};
 
-	loop_through_ticks( false, false );
-	loop_through_ticks( true, false );
+	bool found = false;
 
-	if ( GET_VARIABLE( g_variables.m_advanced_detection, bool ) ) {
-		loop_through_ticks( false, true );
-		loop_through_ticks( true, true );
+	if ( !m_edgebug_data.m_will_edgebug ) {
+		for ( int i = 0; i < mode_count; ++i ) {
+			if ( simulate_mode( modes[ i ] ) ) {
+				found = true;
+				break;
+			}
+		}
+	} else {
+		found = true;
 	}
 
-	if ( !m_edgebug_data.m_will_edgebug )
+	if ( !found )
 		return;
 
-	if ( g_interfaces.m_global_vars_base->m_tick_count < m_edgebug_data.m_ticks_to_stop + m_edgebug_data.m_last_tick + 1 ) {
+	const int cur_tick = g_interfaces.m_global_vars_base->m_tick_count;
+	const int delta    = cur_tick - m_edgebug_data.m_last_tick;
+
+	if ( delta <= m_edgebug_data.m_ticks_to_stop ) {
 		clear_move_buttons( g_ctx.m_cmd );
 
 		if ( m_edgebug_data.m_strafing ) {
-			g_ctx.m_cmd->m_side_move    = m_edgebug_data.m_side_move;
 			g_ctx.m_cmd->m_forward_move = m_edgebug_data.m_forward_move;
-
-			const float final_yaw = g_math.normalize_angle(
-				m_edgebug_data.m_starting_yaw +
-				( m_edgebug_data.m_yaw_delta * ( g_interfaces.m_global_vars_base->m_tick_count - m_edgebug_data.m_last_tick ) ) );
-
-			g_ctx.m_cmd->m_view_point.m_y = final_yaw;
+			g_ctx.m_cmd->m_side_move    = m_edgebug_data.m_side_move;
+			g_ctx.m_cmd->m_view_point.m_y =
+				g_math.normalize_angle( m_edgebug_data.m_starting_yaw + m_edgebug_data.m_yaw_step * static_cast< float >( delta ) );
 		} else {
 			stop_full_move( g_ctx.m_cmd );
 		}
 
-		if ( m_edgebug_data.m_edgebug_method == edgebug_type_t::eb_ducking ) {
-			if ( is_pressed_button( g_ctx.m_cmd, in_jump ) )
-				clear_button( g_ctx.m_cmd, in_jump );
-
+		if ( m_edgebug_data.m_method == edgebug_method_t::ducking ) {
+			clear_button( g_ctx.m_cmd, in_jump );
 			add_button( g_ctx.m_cmd, in_duck );
-		}
-		else
+		} else {
 			clear_button( g_ctx.m_cmd, in_duck );
-
+		}
 	} else {
 		m_edgebug_data.reset( );
 	}
@@ -482,17 +489,18 @@ void n_movement::impl_t::pixel_surf( )
 		add_button( &simulated_cmd, in_duck );
 		clear_button( &simulated_cmd, in_jump );
 
-		const float prev_vel_z = g_ctx.m_local->get_velocity( ).m_z;
-		const int prev_flags   = g_ctx.m_local->get_flags( );
+		const float previous_velocity = g_ctx.m_local->get_velocity( ).m_z;
+		const int previous_flags     = g_ctx.m_local->get_flags( );
 
 		predict_cmd( &simulated_cmd );
 
-		const float cur_vel_z = g_ctx.m_local->get_velocity( ).m_z;
-		const int cur_flags   = g_ctx.m_local->get_flags( );
+		const float current_velocity = g_ctx.m_local->get_velocity( ).m_z;
+		const int current_flags      = g_ctx.m_local->get_flags( );
 
-		if ( !( prev_flags & fl_onground ) && !( cur_flags & fl_onground ) ) {
-			if ( prev_vel_z < g_ctx.half_gravity_per_tick && std::floorf( cur_vel_z ) > std::floorf( prev_vel_z ) && std::roundf(cur_vel_z) == std::roundf(g_ctx.half_gravity_per_tick) ) {
-				m_pixelsurf_data.m_detected = std::roundf( prev_vel_z - g_ctx.half_gravity_per_tick * g_interfaces.m_global_vars_base->m_interval_per_tick ) < std::roundf( g_ctx.m_local->get_velocity( ).m_z );
+		if ( !( previous_flags & fl_onground ) && !( current_flags & fl_onground ) ) {
+			if ( previous_velocity < g_ctx.inverse_half_gravity_per_tick && std::floorf( current_velocity ) > std::floorf( previous_velocity ) && std::roundf( current_velocity ) == std::roundf( g_ctx.inverse_half_gravity_per_tick ) ) {
+				const float expected_vertical_velocity = std::roundf( previous_velocity - g_ctx.gravity_per_tick );
+				m_pixelsurf_data.m_detected            = expected_vertical_velocity < std::roundf( g_ctx.m_local->get_velocity( ).m_z );
 				return;
 			}
 		}
@@ -517,18 +525,20 @@ void n_movement::impl_t::jump_bug_simulation( )
 		add_button( &simulated_cmd, in_duck );
 		clear_button( &simulated_cmd, in_jump );
 
-		const float prev_vel_z    = g_ctx.m_local->get_velocity( ).m_z;
-		const int prev_flags      = g_ctx.m_local->get_flags( );
+		const float previous_velocity = g_ctx.m_local->get_velocity( ).m_z;
+		const int previous_flags      = g_ctx.m_local->get_flags( );
 
 		predict_cmd( &simulated_cmd );
 
-		const float cur_vel_z    = g_ctx.m_local->get_velocity( ).m_z;
-		const int cur_flags      = g_ctx.m_local->get_flags( );
+		const float current_velocity   = g_ctx.m_local->get_velocity( ).m_z;
+		const int current_flags      = g_ctx.m_local->get_flags( );
 
-		if ( !( prev_flags & fl_onground ) && ( cur_flags & fl_onground ) ) {
-			if ( prev_vel_z < std::roundf( g_ctx.half_gravity_per_tick ) && std::floorf( cur_vel_z ) > std::floorf( prev_vel_z ) &&
-			     std::roundf( cur_vel_z ) > std::roundf( g_ctx.half_gravity_per_tick ) ) {
-				m_jumpbug_data.m_will_should = std::roundf( prev_vel_z - g_ctx.half_gravity_per_tick * g_interfaces.m_global_vars_base->m_interval_per_tick ) <= std::roundf( g_ctx.m_local->get_velocity( ).m_z );
+		if ( !( previous_flags & fl_onground ) && ( current_flags & fl_onground ) ) {
+			if ( previous_velocity < std::roundf( g_ctx.inverse_half_gravity_per_tick ) &&
+			     std::floorf( current_velocity ) > std::floorf( previous_velocity ) &&
+			     std::roundf( current_velocity ) > std::roundf( g_ctx.inverse_half_gravity_per_tick ) ) {
+				const float expected_vertical_velocity = std::roundf( previous_velocity - g_ctx.gravity_per_tick );
+				m_jumpbug_data.m_will_should           = expected_vertical_velocity < std::roundf( current_velocity );
 				return;
 			}
 		}
@@ -653,60 +663,44 @@ void n_movement::impl_t::on_frame_stage_notify( int stage )
 		return;
 	}
 
-	c_angle wish_angles = { g_prediction.backup_data.m_view_angles.m_x, g_movement.m_edgebug_data.m_starting_yaw, 0.f };
-
+	c_angle wish_angles        = { g_prediction.backup_data.m_view_angles.m_x, g_movement.m_edgebug_data.m_starting_yaw, 0.f };
 	const float hit_time_delta = g_math.ticks_to_time( g_movement.m_edgebug_data.m_ticks_to_stop );
 	const float cur_time_delta = g_interfaces.m_global_vars_base->m_current_time - g_math.ticks_to_time( g_movement.m_edgebug_data.m_last_tick );
-
-	const float final_yaw = g_math.normalize_angle( g_movement.m_edgebug_data.m_yaw_delta *
-	                                                ( g_movement.m_edgebug_data.m_ticks_to_stop * ( cur_time_delta / hit_time_delta ) ) );
-
+	const float final_yaw      = g_math.normalize_angle( g_movement.m_edgebug_data.m_yaw_step * ( g_movement.m_edgebug_data.m_ticks_to_stop * ( cur_time_delta / hit_time_delta ) ) );
 	wish_angles.m_y += final_yaw;
-
 	g_interfaces.m_engine_client->set_view_angles( wish_angles );
 }
 
 void n_movement::impl_t::detect_edgebug( c_user_cmd* cmd )
 {
-	if ( has_invalid_movement_state( ) || local_entity_is_not_falling( ) || local_entity_is_staying( ) || m_jumpbug_data.m_will_should ||
-	     m_pixelsurf_data.m_detected ) {
+	if ( ( g_ctx.m_local->get_flags( ) & fl_onground ) || ( g_prediction.backup_data.m_flags & fl_onground ) ||
+		( g_ctx.m_local->get_move_type( ) == e_move_types::move_type_ladder ) || ( g_ctx.m_local->get_move_type( ) == e_move_types::move_type_noclip ) || ( g_ctx.m_local->get_move_type( ) == e_move_types::move_type_observer ) || 
+		( g_ctx.m_local->get_velocity( ).length_2d( ) == 0.f ) || std::roundf( g_prediction.backup_data.m_velocity.m_z ) >= 0.0f ) {
 		m_edgebug_data.m_will_edgebug = false;
-		m_edgebug_data.m_will_fail    = true;
+		m_edgebug_data.m_will_fail = true;
 		return;
 	}
 
-	const auto gravity = g_convars[ HASH_BT( "sv_gravity" ) ]->get_float( );
+	if ( g_prediction.backup_data.m_velocity.m_z < g_ctx.inverse_half_gravity_per_tick && std::roundf( g_ctx.m_local->get_velocity( ).m_z ) == std::roundf( g_ctx.inverse_half_gravity_per_tick ) ) {
+		m_edgebug_data.m_will_edgebug = true;
+		m_edgebug_data.m_will_fail    = false;
+	}
 
-	float gravity_vel = ( -( gravity * 0.5f ) * g_interfaces.m_global_vars_base->m_interval_per_tick );
-
-	if ( g_prediction.backup_data.m_velocity.m_z < std::roundf( g_ctx.half_gravity_per_tick ) &&
-	            std::floorf( g_ctx.m_local->get_velocity( ).m_z ) > std::floorf( g_prediction.backup_data.m_velocity.m_z ) &&
-	            g_ctx.m_local->get_velocity( ).m_z < std::roundf( g_ctx.half_gravity_per_tick ) ) {
+	/* stable edgebug range from -5.62895 to -8.293333 */
+	if ( g_prediction.backup_data.m_velocity.m_z < std::roundf( g_ctx.inverse_half_gravity_per_tick ) &&
+	     std::floorf( g_ctx.m_local->get_velocity( ).m_z ) > std::floorf( g_prediction.backup_data.m_velocity.m_z ) &&
+	     g_ctx.m_local->get_velocity( ).m_z < std::roundf( g_ctx.inverse_half_gravity_per_tick ) ) {
 		const float previous_velocity = g_ctx.m_local->get_velocity( ).m_z;
 
 		g_prediction.begin( g_ctx.m_local, cmd );
 		g_prediction.end( g_ctx.m_local );
 
-		const float expected_vertical_velocity = std::roundf( previous_velocity - gravity * g_interfaces.m_global_vars_base->m_interval_per_tick );
+		const float expected_vertical_velocity = std::roundf( previous_velocity - g_ctx.gravity_per_tick );
 
 		m_edgebug_data.m_will_edgebug = expected_vertical_velocity == std::roundf( g_ctx.m_local->get_velocity( ).m_z );
 		m_edgebug_data.m_will_fail    = !( expected_vertical_velocity == std::roundf( g_ctx.m_local->get_velocity( ).m_z ) );
 	}
-}
 
-void n_movement::impl_t::edgebug_data_t::reset( )
-{
-	m_edgebug_method = edgebug_type_t::eb_standing;
-	m_will_edgebug   = false;
-	m_will_fail      = false;
-	m_strafing       = false;
-	m_yaw_delta      = 0.f;
-	m_starting_yaw   = 0.f;
-	m_side_move      = 0.f;
-	m_forward_move   = 0.f;
-	m_saved_mousedx  = 0.f;
-	m_ticks_to_stop  = 0;
-	m_last_tick      = 0;
 }
 
 void n_movement::impl_t::autoduck_data_t::reset( )

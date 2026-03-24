@@ -38,7 +38,9 @@ namespace n_ctx
 
 		char m_windows_directory[ 64 ]{ };
 
-		float half_gravity_per_tick{ };
+		float gravity_per_tick{ };
+
+		float inverse_half_gravity_per_tick{ };
 	};
 
 } // namespace n_globals

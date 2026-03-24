@@ -115,7 +115,8 @@ bool n_hooks::impl_t::on_attach( )
 	if ( g_interfaces.m_engine_client->is_in_game( ) || g_interfaces.m_engine_client->is_connected( ) )
 		g_interfaces.m_client_state->m_delta_tick = -1;
 
-	g_ctx.half_gravity_per_tick = ( -( g_convars[ HASH_BT( "sv_gravity" ) ]->get_float( ) * 0.5f ) * g_interfaces.m_global_vars_base->m_interval_per_tick );
+	g_ctx.gravity_per_tick = g_convars[ HASH_BT( "sv_gravity" ) ]->get_float( ) * g_interfaces.m_global_vars_base->m_interval_per_tick;
+	g_ctx.inverse_half_gravity_per_tick = ( -g_ctx.gravity_per_tick ) * 0.5f;
 
 	return true;
 }
